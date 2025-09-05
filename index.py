@@ -180,11 +180,6 @@ def get_lyrics():
     except Exception as e:
         return jsonify({'error': f'An unexpected server error occurred: {e}'}), 500
 
-# This is the entry point for Vercel
-if __name__ != '__main__':
-    # If we are not running directly, it's likely Vercel.
-    # Vercel will handle the server. We just need to expose the 'app' object.
-    pass
-elif __name__ == '__main__':
-    # For local development
+if __name__ == '__main__':
     app.run(port=3000, debug=True)
+
