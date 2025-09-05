@@ -181,5 +181,6 @@ def get_lyrics():
         return jsonify({'error': f'An unexpected server error occurred: {e}'}), 500
 
 if __name__ == '__main__':
-    app.run(port=3000, debug=True)
+    app.run(port=0.0.0.0, debug=True)
+
 
