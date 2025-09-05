@@ -31,14 +31,28 @@ def call_deezer_api(method, body={}):
     if not DEEZER_SESSION_ID:
         raise Exception("Deezer session is not initialized.")
     api_key = 'ZAIVAHCEISOHWAICUQUEXAEPICENGUAFAEZAIPHAELEEVAHPHUCUFONGUAPASUAY'
-    params = {'method': method, 'api_version': '1.0', 'api_key': api_key, 'input': 3, 'output': 3, 'sid': DEEZER_SESSION_ID}
-    headers = {'User-Agent': 'Deezer/7.17.0.2 CFNetwork/1098.6 Darwin/19.0.0', 'Content-Type': 'application/json'}
+    params = {
+        'method': method,
+        'api_version': '1.0',
+        'api_key': api_key,
+        'input': 3,
+        'output': 3,
+        'sid': DEEZER_SESSION_ID
+    }
+    headers = {
+        'User-Agent': 'Deezer/7.17.0.2 CFNetwork/1098.6 Darwin/19.0.0',
+        'Content-Type': 'application/json'
+    }
     response = _session.post(DEEZER_API_GATEWAY, params=params, data=json.dumps(body), headers=headers)
     response.raise_for_status()
     return response.json()
 def get_track_download_url(track_token, format_id):
     try:
-        payload = { 'license_token': DEEZER_SESSION_ID, 'media': [{'type': 'track', 'id': track_token}], 'formats': [{'cipher': 'BF_CBC_STRIPE', 'format': format_id}]}
+        payload = {
+            'license_token': DEEZER_SESSION_ID,
+            'media': [{'type': 'track', 'id': track_token}],
+            'formats': [{'cipher': 'BF_CBC_STRIPE', 'format': format_id}]
+        }
         response = _session.post(DEEZER_MEDIA_URL, json=payload)
         response.raise_for_status()
         data = response.json()
@@ -46,8 +60,10 @@ def get_track_download_url(track_token, format_id):
     except Exception:
         return None
 def format_track_data(track_data):
-    if not track_data: return None
+    if not track_data:
+        return None
     track_token = track_data.get('TRACK_TOKEN')
+    alb_picture_md5 = track_data.get('ALB_PICTURE')
     return {
         'id': track_data.get('SNG_ID'),
         'title': track_data.get('SNG_TITLE'),
@@ -59,12 +75,18 @@ def format_track_data(track_data):
         'gain': track_data.get('GAIN'),
         'release_date': track_data.get('PHYSICAL_RELEASE_DATE'),
         'track_token': track_token,
-        'artist': {'id': track_data.get('ART_ID'), 'name': track_data.get('ART_NAME')},
-        'album': {'id': track_data.get('ALB_ID'), 'title': track_data.get('ALB_TITLE')},
+        'artist': {
+            'id': track_data.get('ART_ID'),
+            'name': track_data.get('ART_NAME')
+        },
+        'album': {
+            'id': track_data.get('ALB_ID'),
+            'title': track_data.get('ALB_TITLE')
+        },
         'cover': {
-            'small': f"https://e-cdns-images.dzcdn.net/images/cover/{track_data.get('ALB_PICTURE')}/56x56-000000-80-0-0.jpg",
-            'medium': f"https://e-cdns-images.dzcdn.net/images/cover/{track_data.get('ALB_PICTURE')}/250x250-000000-80-0-0.jpg",
-            'large': f"https://e-cdns-images.dzcdn.net/images/cover/{track_data.get('ALB_PICTURE')}/500x500-000000-80-0-0.jpg"
+            'small': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/56x56-000000-80-0-0.jpg",
+            'medium': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/250x250-000000-80-0-0.jpg",
+            'large': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/500x500-000000-80-0-0.jpg"
         },
         'downloads': {
             'FLAC': get_track_download_url(track_token, 'FLAC'),
@@ -75,7 +97,8 @@ def format_track_data(track_data):
 @app.route('/api/track', methods=['GET'])
 def get_track():
     track_id = request.args.get('id') or (request.args.get('url', '').split('/')[-1].split('?')[0] if request.args.get('url') else None)
-    if not track_id: return jsonify({'error': 'Track ID or URL is required.'}), 400
+    if not track_id:
+        return jsonify({'error': 'Track ID or URL is required.'}), 400
     try:
         data = call_deezer_api('song.getData', {'sng_id': track_id})
         return jsonify(format_track_data(data.get('results')))
@@ -84,11 +107,13 @@ def get_track():
 @app.route('/api/album', methods=['GET'])
 def get_album():
     album_id = request.args.get('id') or (request.args.get('url', '').split('/')[-1].split('?')[0] if request.args.get('url') else None)
-    if not album_id: return jsonify({'error': 'Album ID or URL is required.'}), 400
+    if not album_id:
+        return jsonify({'error': 'Album ID or URL is required.'}), 400
     try:
         data = call_deezer_api('album.getData', {'alb_id': album_id})
         album_data = data.get('results', {})
         tracks_data = album_data.get('SONGS', {}).get('data', [])
+        alb_picture_md5 = album_data.get('ALB_PICTURE')
         return jsonify({
             'id': album_data.get('ALB_ID'),
             'title': album_data.get('ALB_TITLE'),
@@ -100,21 +125,33 @@ def get_album():
             'track_count': int(album_data.get('NUMBER_TRACK', 0)),
             'genres': album_data.get('GENRES', {}).get('data', []),
             'cover': {
-                'small': f"https://e-cdns-images.dzcdn.net/images/cover/{album_data.get('ALB_PICTURE')}/56x56-000000-80-0-0.jpg",
-                'medium': f"https://e-cdns-images.dzcdn.net/images/cover/{album_data.get('ALB_PICTURE')}/250x250-000000-80-0-0.jpg",
-                'large': f"https://e-cdns-images.dzcdn.net/images/cover/{album_data.get('ALB_PICTURE')}/500x500-000000-80-0-0.jpg"
+                'small': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/56x56-000000-80-0-0.jpg",
+                'medium': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/250x250-000000-80-0-0.jpg",
+                'large': f"https://e-cdns-images.dzcdn.net/images/cover/{alb_picture_md5}/500x500-000000-80-0-0.jpg"
             },
-            'tracks': [{'id': track.get('SNG_ID'),'title': track.get('SNG_TITLE'),'artist': {'id': track.get('ART_ID'), 'name': track.get('ART_NAME')},'album': {'id': track.get('ALB_ID'), 'title': track.get('ALB_TITLE')},'duration': int(track.get('DURATION', 0)),'track_number': track.get('TRACK_POSITION'),'disk_number': track.get('DISK_NUMBER')} for track in tracks_data]
+            'tracks': [
+                {
+                    'id': track.get('SNG_ID'),
+                    'title': track.get('SNG_TITLE'),
+                    'artist': {'id': track.get('ART_ID'), 'name': track.get('ART_NAME')},
+                    'album': {'id': track.get('ALB_ID'), 'title': track.get('ALB_TITLE')},
+                    'duration': int(track.get('DURATION', 0)),
+                    'track_number': track.get('TRACK_POSITION'),
+                    'disk_number': track.get('DISK_NUMBER')
+                } for track in tracks_data
+            ]
         })
     except Exception as e:
         return jsonify({'error': f'An unexpected server error occurred: {e}'}), 500
 @app.route('/api/artist', methods=['GET'])
 def get_artist():
     artist_id = request.args.get('id') or (request.args.get('url', '').split('/')[-1].split('?')[0] if request.args.get('url') else None)
-    if not artist_id: return jsonify({'error': 'Artist ID or URL is required.'}), 400
+    if not artist_id:
+        return jsonify({'error': 'Artist ID or URL is required.'}), 400
     try:
         artist_data = call_deezer_api('artist.getData', {'art_id': artist_id}).get('results', {})
         top_tracks_data = call_deezer_api('artist.getTopTrack', {'art_id': artist_id}).get('results', {}).get('data', [])
+        art_picture_md5 = artist_data.get('ART_PICTURE')
         return jsonify({
             'id': artist_data.get('ART_ID'),
             'name': artist_data.get('ART_NAME'),
@@ -122,9 +159,9 @@ def get_artist():
             'nb_fan': int(artist_data.get('NB_FAN', 0)),
             'nb_albums': int(artist_data.get('NB_ALBUM', 0)),
             'picture': {
-                'small': f"https://e-cdns-images.dzcdn.net/images/artist/{artist_data.get('ART_PICTURE')}/56x56-000000-80-0-0.jpg",
-                'medium': f"https://e-cdns-images.dzcdn.net/images/artist/{artist_data.get('ART_PICTURE')}/250x250-000000-80-0-0.jpg",
-                'large': f"https://e-cdns-images.dzcdn.net/images/artist/{artist_data.get('ART_PICTURE')}/500x500-000000-80-0-0.jpg"
+                'small': f"https://e-cdns-images.dzcdn.net/images/artist/{art_picture_md5}/56x56-000000-80-0-0.jpg",
+                'medium': f"https://e-cdns-images.dzcdn.net/images/artist/{art_picture_md5}/250x250-000000-80-0-0.jpg",
+                'large': f"https://e-cdns-images.dzcdn.net/images/artist/{art_picture_md5}/500x500-000000-80-0-0.jpg"
             },
             'top_tracks': [format_track_data(track) for track in top_tracks_data]
         })
@@ -133,11 +170,13 @@ def get_artist():
 @app.route('/api/playlist', methods=['GET'])
 def get_playlist():
     playlist_id = request.args.get('id') or (request.args.get('url', '').split('/')[-1].split('?')[0] if request.args.get('url') else None)
-    if not playlist_id: return jsonify({'error': 'Playlist ID or URL is required.'}), 400
+    if not playlist_id:
+        return jsonify({'error': 'Playlist ID or URL is required.'}), 400
     try:
         data = call_deezer_api('playlist.getData', {'playlist_id': playlist_id})
         playlist_data = data.get('results', {})
         tracks_data = playlist_data.get('SONGS', {}).get('data', [])
+        playlist_picture_md5 = playlist_data.get('PLAYLIST_PICTURE')
         return jsonify({
             'id': playlist_data.get('PLAYLIST_ID'),
             'title': playlist_data.get('TITLE'),
@@ -147,9 +186,9 @@ def get_playlist():
             'track_count': int(playlist_data.get('NB_SONG', 0)),
             'fans': int(playlist_data.get('NB_FAN', 0)),
             'picture': {
-                'small': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_data.get('PLAYLIST_PICTURE')}/56x56-000000-80-0-0.jpg",
-                'medium': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_data.get('PLAYLIST_PICTURE')}/250x250-000000-80-0-0.jpg",
-                'large': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_data.get('PLAYLIST_PICTURE')}/500x500-000000-80-0-0.jpg"
+                'small': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_picture_md5}/56x56-000000-80-0-0.jpg",
+                'medium': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_picture_md5}/250x250-000000-80-0-0.jpg",
+                'large': f"https://e-cdns-images.dzcdn.net/images/playlist/{playlist_picture_md5}/500x500-000000-80-0-0.jpg"
             },
             'tracks': [format_track_data(track) for track in tracks_data]
         })
@@ -158,17 +197,28 @@ def get_playlist():
 @app.route('/api/artist/discography', methods=['GET'])
 def get_artist_discography():
     artist_id = request.args.get('id') or (request.args.get('url', '').split('/')[-1].split('?')[0] if request.args.get('url') else None)
-    if not artist_id: return jsonify({'error': 'Artist ID or URL is required.'}), 400
+    if not artist_id:
+        return jsonify({'error': 'Artist ID or URL is required.'}), 400
     try:
         data = call_deezer_api('album.getDiscography', {'art_id': artist_id, 'nb': 500})
         albums_data = data.get('results', {}).get('data', [])
-        return jsonify({'artist_id': artist_id,'albums': [{'id': album.get('ALB_ID'),'title': album.get('ALB_TITLE'),'release_date': album.get('PHYSICAL_RELEASE_DATE')} for album in albums_data]})
+        return jsonify({
+            'artist_id': artist_id,
+            'albums': [
+                {
+                    'id': album.get('ALB_ID'),
+                    'title': album.get('ALB_TITLE'),
+                    'release_date': album.get('PHYSICAL_RELEASE_DATE')
+                } for album in albums_data
+            ]
+        })
     except Exception as e:
         return jsonify({'error': f'An unexpected server error occurred: {e}'}), 500
 @app.route('/api/lyrics', methods=['GET'])
 def get_lyrics():
     track_id = request.args.get('id')
-    if not track_id: return jsonify({'error': 'Track ID is required.'}), 400
+    if not track_id:
+        return jsonify({'error': 'Track ID is required.'}), 400
     try:
         data = call_deezer_api('song.getLyrics', {'sng_id': track_id})
         lyrics_data = data.get('results', {})
@@ -179,8 +229,5 @@ def get_lyrics():
         })
     except Exception as e:
         return jsonify({'error': f'An unexpected server error occurred: {e}'}), 500
-
 if __name__ == '__main__':
-    app.run(port=0.0.0.0, debug=True)
-
-
+    app.run(host='0.0.0.0', port=5000, debug=True)
